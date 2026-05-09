@@ -703,7 +703,7 @@ function wrapText(ctx, text, maxWidth) {
 let renderReqId = null;
 let renderGeneration = 0;  // increment on each new render; stale frames abort themselves
 
-function doRender(isExport = false) {
+async function doRender(isExport = false) {
   const text = els.textInput.value;
   if (!text.trim()) { els.statusText.textContent = '请输入文字'; return null; }
 
@@ -741,6 +741,7 @@ function doRender(isExport = false) {
 
   targetCtx.font = `${fontSize}px ${fontFamily}`;
   targetCtx.textBaseline = 'alphabetic';
+  await document.fonts.ready;
 
   const contentW = W - margin * 2;
   const lineHeight = fontSize * params.lineSpacing;
@@ -847,8 +848,8 @@ function doRender(isExport = false) {
 }
 
 // ===================== 导出 =====================
-document.getElementById('exportPng').addEventListener('click', () => {
-  const result = doRender(true);
+document.getElementById('exportPng').addEventListener('click', async () => {
+  const result = await doRender(true);
   if (!result) return;
   const link = document.createElement('a');
   link.download = '手写稿.png';
@@ -883,6 +884,7 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
   const octx = osc.getContext('2d');
   octx.font = `${fontSize}px ${fontFamily}`;
   octx.textBaseline = 'alphabetic';
+  await document.fonts.ready;
 
   const contentW = W - margin * 2;
   const lineHeight = fontSize * params.lineSpacing;
