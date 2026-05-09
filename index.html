@@ -637,7 +637,28 @@ function loadConfig() {
 let renderTimer = null;
 function scheduleRender() {
   if (renderTimer) clearTimeout(renderTimer);
-  renderTimer = setTimeout(() => doRender(false), 180);
+  // Cancel any in-progress frame rendering immediately
+  if (renderReqId) {
+    cancelAnimationFrame(renderReqId);
+    renderReqId = null;
+  }
+  // Clear text area of canvas to show "loading" state
+  const ctx = canvas.getContext('2d');
+  if (bgImage) {
+    ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  // Show loading indicator
+  ctx.fillStyle = '#999';
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('正在渲染...', canvas.width / 2, canvas.height / 2);
+  ctx.textAlign = 'left';
+  els.statusText.textContent = '正在渲染...';
+  setProgress(0);
+
+  renderTimer = setTimeout(() => doRender(false), 120);
 }
 function setProgress(v) { els.progressFill.style.width = (v*100)+'%'; }
 
