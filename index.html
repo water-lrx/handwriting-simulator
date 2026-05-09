@@ -669,6 +669,8 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
+let renderReqId = null;
+
 function doRender(isExport = false) {
   const text = els.textInput.value;
   if (!text.trim()) { els.statusText.textContent = '请输入文字'; return null; }
@@ -716,49 +718,93 @@ function doRender(isExport = false) {
   els.statusText.textContent = isExport ? '导出中...' : '渲染中...';
   setProgress(0);
 
-  let y = margin + fontSize;
-  const totalChars = lines.reduce((s,l) => s+l.length, 0);
-  let done = 0, pageCount = 1;
+  // Export: synchronous render
+  if (isExport) {
+    let y = margin + fontSize;
+    let done = 0, pageCount = 1;
+    for (const line of lines) {
+      if (y > H - margin) { pageCount++; y = margin + fontSize; }
+      let x = margin;
+      for (const ch of line) {
+        if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
+        const cw = targetCtx.measureText(ch).width;
+        const cv = params.colorVar;
+        const r = Math.max(0, Math.min(255, params.color[0] + Math.floor((rng()-0.5)*2*cv)));
+        const g = Math.max(0, Math.min(255, params.color[1] + Math.floor((rng()-0.5)*2*cv)));
+        const b = Math.max(0, Math.min(255, params.color[2] + Math.floor((rng()-0.5)*2*cv)));
+        targetCtx.fillStyle = `rgb(${r},${g},${b})`;
+        const dx = (rng()-0.5)*2*offX, dy = (rng()-0.5)*2*offY;
+        const rot = (rng()-0.5)*2*params.rot * (Math.PI/180);
+        const sc = 1.0 + (rng()-0.5)*2*params.scaleVar;
+        targetCtx.save();
+        targetCtx.translate(x + dx + cw/2, y + dy);
+        targetCtx.rotate(rot); targetCtx.scale(sc, sc);
+        targetCtx.fillText(ch, -cw/2, 0);
+        targetCtx.restore();
+        x += cw + wordSpacing; done++;
+      }
+      y += lineHeight;
+    }
+    setProgress(1);
+    els.statusText.textContent = '导出完成';
+    return { canvas: targetCanvas, pageCount, lines };
+  }
 
-  for (const line of lines) {
-    if (y > H - margin) {
-      // New page indicator for preview
-      if (!isExport) {
+  // Preview: frame-by-frame render for smooth UI
+  if (renderReqId) cancelAnimationFrame(renderReqId);
+
+  let lineIdx = 0;
+  let y = margin + fontSize;
+  let pageCount = 1;
+  const totalChars = lines.reduce((s,l) => s+l.length, 0);
+  let done = 0;
+  const LINES_PER_FRAME = 3; // render 3 lines per frame
+
+  function drawFrame() {
+    const frameStart = performance.now();
+    for (let f = 0; f < LINES_PER_FRAME && lineIdx < lines.length; f++) {
+      if (y > H - margin) {
         targetCtx.fillStyle = '#ccc';
         targetCtx.font = `${Math.floor(12*scale)}px sans-serif`;
         targetCtx.fillText('— 第 ' + (pageCount+1) + ' 页 —', W/2 - 40*scale, H - 10*scale);
+        pageCount++; y = margin + fontSize;
+        break; // stop at page boundary for preview
       }
-      pageCount++; y = margin + fontSize;
-      if (!isExport) break; // Preview only shows first page
+      const line = lines[lineIdx];
+      let x = margin;
+      for (const ch of line) {
+        if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
+        const cw = targetCtx.measureText(ch).width;
+        const cv = params.colorVar;
+        const r = Math.max(0, Math.min(255, params.color[0] + Math.floor((rng()-0.5)*2*cv)));
+        const g = Math.max(0, Math.min(255, params.color[1] + Math.floor((rng()-0.5)*2*cv)));
+        const b = Math.max(0, Math.min(255, params.color[2] + Math.floor((rng()-0.5)*2*cv)));
+        targetCtx.fillStyle = `rgb(${r},${g},${b})`;
+        const dx = (rng()-0.5)*2*offX, dy = (rng()-0.5)*2*offY;
+        const rot = (rng()-0.5)*2*params.rot * (Math.PI/180);
+        const sc = 1.0 + (rng()-0.5)*2*params.scaleVar;
+        targetCtx.save();
+        targetCtx.translate(x + dx + cw/2, y + dy);
+        targetCtx.rotate(rot); targetCtx.scale(sc, sc);
+        targetCtx.fillText(ch, -cw/2, 0);
+        targetCtx.restore();
+        x += cw + wordSpacing; done++;
+      }
+      y += lineHeight; lineIdx++;
     }
-    let x = margin;
-    for (const ch of line) {
-      if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
-      const cw = targetCtx.measureText(ch).width;
-      const cv = params.colorVar;
-      const r = Math.max(0, Math.min(255, params.color[0] + Math.floor((rng()-0.5)*2*cv)));
-      const g = Math.max(0, Math.min(255, params.color[1] + Math.floor((rng()-0.5)*2*cv)));
-      const b = Math.max(0, Math.min(255, params.color[2] + Math.floor((rng()-0.5)*2*cv)));
-      targetCtx.fillStyle = `rgb(${r},${g},${b})`;
+    setProgress(done / totalChars);
 
-      const dx = (rng()-0.5)*2*offX, dy = (rng()-0.5)*2*offY;
-      const rot = (rng()-0.5)*2*params.rot * (Math.PI/180);
-      const sc = 1.0 + (rng()-0.5)*2*params.scaleVar;
-
-      targetCtx.save();
-      targetCtx.translate(x + dx + cw/2, y + dy);
-      targetCtx.rotate(rot); targetCtx.scale(sc, sc);
-      targetCtx.fillText(ch, -cw/2, 0);
-      targetCtx.restore();
-
-      x += cw + wordSpacing; done++;
+    if (lineIdx < lines.length && y <= H - margin) {
+      renderReqId = requestAnimationFrame(drawFrame);
+    } else {
+      setProgress(1);
+      els.statusText.textContent = `就绪 · ${pageCount} 页`;
+      els.previewInfo.textContent = `${W}×${H} · ${lines.length} 行`;
+      renderReqId = null;
     }
-    y += lineHeight;
-    if (done % 10 === 0) setProgress(done / totalChars);
   }
-  setProgress(1);
-  els.statusText.textContent = isExport ? '导出完成' : `就绪 · ${pageCount} 页`;
-  els.previewInfo.textContent = `${W}×${H} · ${lines.length} 行`;
+
+  renderReqId = requestAnimationFrame(drawFrame);
   return { canvas: targetCanvas, pageCount, lines };
 }
 
