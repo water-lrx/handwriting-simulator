@@ -642,6 +642,7 @@ function scheduleRender() {
     cancelAnimationFrame(renderReqId);
     renderReqId = null;
   }
+  ++renderGeneration; // invalidate any stale frames
   // Clear text area of canvas to show "loading" state
   const ctx = canvas.getContext('2d');
   if (bgImage) {
@@ -691,6 +692,7 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 let renderReqId = null;
+let renderGeneration = 0;  // increment on each new render; stale frames abort themselves
 
 function doRender(isExport = false) {
   const text = els.textInput.value;
@@ -773,6 +775,7 @@ function doRender(isExport = false) {
 
   // Preview: frame-by-frame render for smooth UI
   if (renderReqId) cancelAnimationFrame(renderReqId);
+  const myGen = ++renderGeneration;
 
   let lineIdx = 0;
   let y = margin + fontSize;
@@ -782,8 +785,9 @@ function doRender(isExport = false) {
   const LINES_PER_FRAME = 3; // render 3 lines per frame
 
   function drawFrame() {
-    const frameStart = performance.now();
+    if (myGen !== renderGeneration) return; // stale frame, abort
     for (let f = 0; f < LINES_PER_FRAME && lineIdx < lines.length; f++) {
+      if (myGen !== renderGeneration) return;
       if (y > H - margin) {
         targetCtx.fillStyle = '#ccc';
         targetCtx.font = `${Math.floor(12*scale)}px sans-serif`;
@@ -794,6 +798,7 @@ function doRender(isExport = false) {
       const line = lines[lineIdx];
       let x = margin;
       for (const ch of line) {
+        if (myGen !== renderGeneration) return;
         if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
         const cw = targetCtx.measureText(ch).width;
         const cv = params.colorVar;
@@ -816,8 +821,10 @@ function doRender(isExport = false) {
     setProgress(done / totalChars);
 
     if (lineIdx < lines.length && y <= H - margin) {
+      if (myGen !== renderGeneration) return;
       renderReqId = requestAnimationFrame(drawFrame);
     } else {
+      if (myGen !== renderGeneration) return;
       setProgress(1);
       els.statusText.textContent = `就绪 · ${pageCount} 页`;
       els.previewInfo.textContent = `${W}×${H} · ${lines.length} 行`;
