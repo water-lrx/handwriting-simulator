@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手写模拟器 Pro — 在线版</title>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/downloadjs@1.4.7/download.min.js"></script>
+<style>
+@font-face { font-family: 'F1'; src: url('字体/云烟体.ttf') format('truetype'); }
+@font-face { font-family: 'F2'; src: url('字体/华阳手写体.ttf') format('truetype'); }
+@font-face { font-family: 'F3'; src: url('字体/李国夫手写体.ttf') format('truetype'); }
+@font-face { font-family: 'F4'; src: url('字体/青叶手写体.ttf') format('truetype'); }
+
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --bg: #f3f4f6;
+  --card: #ffffff;
+  --text: #1f2937;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.05);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  background: var(--bg); color: var(--text); height: 100vh; overflow: hidden;
+}
+
+/* Header */
+.header {
+  height: 56px; background: var(--card); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; flex-shrink: 0; z-index: 10;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.logo-icon {
+  width: 32px; height: 32px; background: var(--primary); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+  font-size: 18px; font-weight: bold;
+}
+.header-title { font-size: 17px; font-weight: 600; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.btn {
+  padding: 8px 16px; border-radius: 8px; border: none; font-size: 13px;
+  font-weight: 500; cursor: pointer; transition: all 0.15s; display: inline-flex;
+  align-items: center; gap: 6px;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: #e5e7eb; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #15803d; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* Layout */
+.container { display: flex; height: calc(100vh - 56px); }
+
+/* Sidebar */
+.sidebar {
+  width: 300px; min-width: 260px; background: var(--card);
+  border-right: 1px solid var(--border); overflow-y: auto;
+  padding: 16px; display: flex; flex-direction: column; gap: 14px;
+}
+.sidebar::-webkit-scrollbar { width: 5px; }
+.sidebar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+.panel {
+  background: #fafafa; border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+}
+.panel-title {
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: flex; justify-content: space-between; font-size: 13px;
+  color: var(--text-secondary); margin-bottom: 5px;
+}
+.field label strong { color: var(--text); font-weight: 500; }
+
+select, input[type="range"], input[type="color"] {
+  width: 100%; font-size: 13px; font-family: inherit;
+}
+select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: #fff; cursor: pointer; outline: none;
+}
+select:focus { border-color: var(--primary); }
+input[type="range"] {
+  -webkit-appearance: none; height: 5px; border-radius: 3px;
+  background: #e5e7eb; outline: none; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
+  background: var(--primary); cursor: pointer; border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input[type="color"] {
+  height: 34px; border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; padding: 2px; background: #fff;
+}
+
+.presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.preset-btn {
+  flex: 1; min-width: 60px; padding: 7px 0; border: 1px solid var(--border);
+  background: #fff; border-radius: 6px; cursor: pointer; font-size: 12px;
+  font-weight: 500; transition: all 0.12s; color: var(--text-secondary);
+}
+.preset-btn:hover { border-color: var(--primary); color: var(--primary); }
+.preset-btn.active {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+}
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.toolbar {
+  padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.toolbar-group { display: flex; gap: 6px; align-items: center; }
+.toolbar-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+.workspace { flex: 1; display: flex; overflow: hidden; }
+
+/* Editor */
+.editor-wrap {
+  width: 380px; min-width: 280px; background: var(--card);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+}
+.editor-header {
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+  display: flex; justify-content: space-between; align-items: center;
+}
+#textInput {
+  flex: 1; width: 100%; padding: 14px; border: none; resize: none;
+  font-size: 15px; line-height: 1.7; outline: none; font-family: inherit;
+}
+#textInput::placeholder { color: #9ca3af; }
+.char-count {
+  padding: 8px 14px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-secondary); text-align: right;
+}
+
+/* Preview */
+.preview-wrap {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  background: #e8e8e8;
+}
+.preview-header {
+  padding: 8px 16px; background: var(--card); border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--text-secondary); display: flex;
+  justify-content: space-between; align-items: center;
+}
+.preview-area {
+  flex: 1; overflow: auto; padding: 20px; display: flex;
+  justify-content: center; align-items: flex-start;
+}
+#previewCanvas {
+  background: #fff; box-shadow: var(--shadow); border-radius: 4px;
+  max-width: 100%;
+}
+
+/* Status */
+.status-bar {
+  padding: 8px 16px; background: var(--card); border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-secondary); display: flex;
+  justify-content: space-between; align-items: center;
+}
+#progressBar {
+  width: 120px; height: 5px; border-radius: 3px; background: #e5e7eb; overflow: hidden;
+}
+#progressBar .fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.2s; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 20px; right: 20px; padding: 12px 18px;
+  background: #1f2937; color: #fff; border-radius: 8px; font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000;
+  opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .sidebar { width: 260px; min-width: 220px; }
+  .editor-wrap { width: 300px; min-width: 200px; }
+}
+@media (max-width: 900px) {
+  .container { flex-direction: column; }
+  .sidebar { width: 100%; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+  .workspace { flex-direction: column; }
+  .editor-wrap { width: 100%; height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo-icon">✍</div>
+    <div class="header-title">手写模拟器 Pro</div>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-secondary btn-sm" id="refreshSeed">🎲 换一版</button>
+    <button class="btn btn-success btn-sm" id="exportPng">📷 导出 PNG</button>
+    <button class="btn btn-primary btn-sm" id="exportPdf">📄 导出 PDF</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="panel">
+      <div class="panel-title">字体与背景</div>
+      <div class="field">
+        <label><strong>手写字体</strong></label>
+        <select id="fontSelect"></select>
+      </div>
+      <div class="field">
+        <label><strong>背景纸张</strong></label>
+        <select id="bgSelect"></select>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">墨迹 <span style="text-transform:none;letter-spacing:0;font-weight:400;"></span></div>
+      <div class="field">
+        <label><strong>颜色</strong></label>
+        <input type="color" id="inkColor" value="#1e1e28">
+      </div>
+      <div class="field">
+        <label><strong>浓淡变化</strong> <span id="colorVarVal">25</span></label>
+        <input type="range" id="colorVar" min="0" max="80" value="25">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">排版</div>
+      <div class="field">
+        <label><strong>字号</strong> <span id="fontSizeVal">48</span>px</label>
+        <input type="range" id="fontSize" min="16" max="100" value="48">
+      </div>
+      <div class="field">
+        <label><strong>行间距</strong> <span id="lineSpaceVal">1.8</span></label>
+        <input type="range" id="lineSpace" min="1.0" max="3.0" step="0.1" value="1.8">
+      </div>
+      <div class="field">
+        <label><strong>字间距</strong> <span id="wordSpaceVal">0.5</span>px</label>
+        <input type="range" id="wordSpace" min="0" max="20" step="0.5" value="0.5">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">手写效果 <span style="text-transform:none;letter-spacing:0;font-weight:400;">数值越大越潦草</span></div>
+      <div class="field">
+        <label><strong>水平偏移</strong> <span id="offXVal">1.5</span>px</label>
+        <input type="range" id="offX" min="0" max="10" step="0.1" value="1.5">
+      </div>
+      <div class="field">
+        <label><strong>垂直偏移</strong> <span id="offYVal">1.2</span>px</label>
+        <input type="range" id="offY" min="0" max="10" step="0.1" value="1.2">
+      </div>
+      <div class="field">
+        <label><strong>旋转角度</strong> <span id="rotVal">2.0</span>°</label>
+        <input type="range" id="rot" min="0" max="15" step="0.1" value="2.0">
+      </div>
+      <div class="field">
+        <label><strong>大小变化</strong> <span id="scaleVal">0.04</span></label>
+        <input type="range" id="scaleVar" min="0" max="0.3" step="0.01" value="0.04">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">页面</div>
+      <div class="field">
+        <label><strong>边距</strong> <span id="marginVal">80</span>px</label>
+        <input type="range" id="margin" min="20" max="200" value="80">
+      </div>
+      <div class="field">
+        <label><strong>导出清晰度</strong> <span id="dpiVal">200</span>DPI</label>
+        <input type="range" id="dpi" min="72" max="300" value="200">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">快速预设</div>
+      <div class="presets">
+        <button class="preset-btn active" data-preset="natural">自然</button>
+        <button class="preset-btn" data-preset="neat">工整</button>
+        <button class="preset-btn" data-preset="messy">潦草</button>
+      </div>
+      <div class="presets" style="margin-top:6px;">
+        <button class="preset-btn" data-preset="homework">作业</button>
+        <button class="preset-btn" data-preset="letter">信纸</button>
+        <button class="preset-btn" data-preset="note">笔记</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <button class="btn btn-secondary btn-sm" id="clearText">清空</button>
+        <button class="btn btn-secondary btn-sm" id="loadDemo">示例文字</button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <div class="toolbar-group">
+        <button class="btn btn-secondary btn-sm" id="saveConfig">保存配置</button>
+        <button class="btn btn-secondary btn-sm" id="loadConfig">加载配置</button>
+      </div>
+    </div>
+
+    <div class="workspace">
+      <div class="editor-wrap">
+        <div class="editor-header">输入文字</div>
+        <textarea id="textInput" placeholder="在这里输入要转换为手写的文字..."></textarea>
+        <div class="char-count" id="charCount">0 字</div>
+      </div>
+      <div class="preview-wrap">
+        <div class="preview-header">
+          <span>实时预览</span>
+          <span id="previewInfo">-</span>
+        </div>
+        <div class="preview-area">
+          <canvas id="previewCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusText">正在加载...</span>
+      <div id="progressBar"><div class="fill"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================== 资源定义 =====================
+const BUILT_IN_FONTS = [
+  { name: '云烟体', family: 'F1' },
+  { name: '华阳手写体', family: 'F2' },
+  { name: '李国夫手写体', family: 'F3' },
+  { name: '青叶手写体', family: 'F4' },
+];
+const BUILT_IN_BACKGROUNDS = [
+  { name: '纯白', path: null },
+  { name: 'A4本子', path: '背景/A4本子.jpg' },
+  { name: 'A4白纸', path: '背景/A4纯白.jpg' },
+  { name: '发黄条纸', path: '背景/发黄 条纸.jpg' },
+  { name: '发黄格子纸', path: '背景/发黄 格子纸.jpg' },
+  { name: '白色条纸', path: '背景/白色条纸.jpg' },
+  { name: '牛皮纸', path: '背景/黄 牛皮纸.jpg' },
+];
+
+const PRESETS = {
+  neat: { offX: 0.3, offY: 0.2, rot: 0.5, scale: 0.01, line: 1.5, word: 0, colorVar: 10 },
+  natural: { offX: 1.5, offY: 1.2, rot: 2.0, scale: 0.04, line: 1.8, word: 0.5, colorVar: 25 },
+  messy: { offX: 3.0, offY: 2.5, rot: 4.5, scale: 0.08, line: 2.0, word: 1, colorVar: 35 },
+  homework: { offX: 0.8, offY: 0.6, rot: 1.0, scale: 0.02, line: 2.2, word: 1, colorVar: 15, fontSize: 36, bg: 1 },
+  letter: { offX: 1.2, offY: 1.0, rot: 1.5, scale: 0.03, line: 1.9, word: 0.3, colorVar: 20, fontSize: 44, bg: 6 },
+  note: { offX: 0.5, offY: 0.4, rot: 0.8, scale: 0.015, line: 1.6, word: 0.2, colorVar: 12, fontSize: 32, bg: 4 },
+};
+
+const DEMO_TEXT = `致橡树
+
+我如果爱你——
+绝不像攀援的凌霄花，
+借你的高枝炫耀自己；
+我如果爱你——
+绝不学痴情的鸟儿，
+为绿荫重复单调的歌曲；
+也不止像泉源，
+常年送来清凉的慰藉；
+也不止像险峰，
+增加你的高度，衬托你的威仪。
+
+甚至日光，
+甚至春雨。
+
+不，这些都还不够！
+我必须是你近旁的一株木棉，
+作为树的形象和你站在一起。
+根，紧握在地下；
+叶，相触在云里。
+每一阵风过，
+我们都互相致意，
+但没有人，
+听懂我们的言语。`;
+
+// ===================== 引擎 =====================
+const canvas = document.getElementById('previewCanvas');
+const ctx = canvas.getContext('2d');
+let bgImage = null;
+let renderSeed = 42;
+
+const els = {
+  fontSelect: document.getElementById('fontSelect'),
+  bgSelect: document.getElementById('bgSelect'),
+  inkColor: document.getElementById('inkColor'),
+  colorVar: document.getElementById('colorVar'),
+  fontSize: document.getElementById('fontSize'),
+  lineSpace: document.getElementById('lineSpace'),
+  wordSpace: document.getElementById('wordSpace'),
+  offX: document.getElementById('offX'),
+  offY: document.getElementById('offY'),
+  rot: document.getElementById('rot'),
+  scaleVar: document.getElementById('scaleVar'),
+  margin: document.getElementById('margin'),
+  dpi: document.getElementById('dpi'),
+  textInput: document.getElementById('textInput'),
+  statusText: document.getElementById('statusText'),
+  progressFill: document.querySelector('#progressBar .fill'),
+  previewInfo: document.getElementById('previewInfo'),
+  charCount: document.getElementById('charCount'),
+  toast: document.getElementById('toast'),
+};
+
+function seededRandom(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+function showToast(msg) {
+  els.toast.textContent = msg;
+  els.toast.classList.add('show');
+  setTimeout(() => els.toast.classList.remove('show'), 2500);
+}
+
+// ===================== 初始化 =====================
+async function init() {
+  BUILT_IN_FONTS.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.family; opt.textContent = f.name;
+    els.fontSelect.appendChild(opt);
+  });
+  const cfo = document.createElement('option');
+  cfo.value = '__custom__'; cfo.textContent = '━ 上传自定义 ━';
+  els.fontSelect.appendChild(cfo);
+
+  BUILT_IN_BACKGROUNDS.forEach((b, i) => {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = b.name;
+    els.bgSelect.appendChild(opt);
+  });
+  const cbo = document.createElement('option');
+  cbo.value = '__custom__'; cbo.textContent = '━ 上传自定义 ━';
+  els.bgSelect.appendChild(cbo);
+
+  await loadBackground(1);
+  els.textInput.value = DEMO_TEXT;
+  updateCharCount();
+  els.statusText.textContent = '就绪';
+  scheduleRender();
+}
+
+function loadBackground(idx) {
+  const bg = BUILT_IN_BACKGROUNDS[idx];
+  if (!bg || !bg.path) { bgImage = null; return Promise.resolve(); }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => { bgImage = img; resolve(); };
+    img.onerror = () => { bgImage = null; resolve(); };
+    img.src = bg.path;
+  });
+}
+
+// ===================== 事件 =====================
+els.fontSelect.addEventListener('change', async () => {
+  if (els.fontSelect.value === '__custom__') {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.ttf,.ttc,.otf';
+    input.onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const buf = await file.arrayBuffer();
+        const name = 'CF_' + Date.now();
+        const ff = new FontFace(name, buf);
+        await ff.load(); document.fonts.add(ff);
+        const opt = els.fontSelect.querySelector('option[value="__custom__"]');
+        if (opt) { opt.value = name; opt.textContent = '📁 ' + file.name; }
+        els.fontSelect.value = name;
+        showToast('字体已加载'); scheduleRender();
+      } catch(err) { showToast('字体加载失败'); }
+    };
+    input.click();
+  } else { scheduleRender(); }
+});
+
+els.bgSelect.addEventListener('change', async () => {
+  if (els.bgSelect.value === '__custom__') {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.jpg,.jpeg,.png';
+    input.onchange = (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const r = new FileReader();
+      r.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          bgImage = img;
+          const opt = els.bgSelect.querySelector('option[value="__custom__"]');
+          if (opt) { opt.value = '__c__'; opt.textContent = '📁 ' + file.name; }
+          showToast('背景已加载'); scheduleRender();
+        };
+        img.src = ev.target.result;
+      };
+      r.readAsDataURL(file);
+    };
+    input.click();
+  } else {
+    await loadBackground(parseInt(els.bgSelect.value));
+    scheduleRender();
+  }
+});
+
+// Range inputs
+const rangeMap = [
+  ['colorVar','colorVarVal'], ['fontSize','fontSizeVal'],
+  ['lineSpace','lineSpaceVal'], ['wordSpace','wordSpaceVal'],
+  ['offX','offXVal'], ['offY','offYVal'], ['rot','rotVal'],
+  ['scaleVar','scaleVal'], ['margin','marginVal'], ['dpi','dpiVal'],
+];
+rangeMap.forEach(([id,valId]) => {
+  const el = document.getElementById(id), vel = document.getElementById(valId);
+  el.addEventListener('input', () => { vel.textContent = el.value; scheduleRender(); });
+});
+els.inkColor.addEventListener('input', scheduleRender);
+els.textInput.addEventListener('input', () => { updateCharCount(); scheduleRender(); });
+
+function updateCharCount() {
+  const len = els.textInput.value.length;
+  els.charCount.textContent = len + ' 字';
+}
+
+// Presets
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const p = PRESETS[btn.dataset.preset];
+    if (!p) return;
+    // Apply values
+    if (p.offX !== undefined) { els.offX.value = p.offX; document.getElementById('offXVal').textContent = p.offX; }
+    if (p.offY !== undefined) { els.offY.value = p.offY; document.getElementById('offYVal').textContent = p.offY; }
+    if (p.rot !== undefined) { els.rot.value = p.rot; document.getElementById('rotVal').textContent = p.rot; }
+    if (p.scale !== undefined) { els.scaleVar.value = p.scale; document.getElementById('scaleVal').textContent = p.scale; }
+    if (p.line !== undefined) { els.lineSpace.value = p.line; document.getElementById('lineSpaceVal').textContent = p.line; }
+    if (p.word !== undefined) { els.wordSpace.value = p.word; document.getElementById('wordSpaceVal').textContent = p.word; }
+    if (p.colorVar !== undefined) { els.colorVar.value = p.colorVar; document.getElementById('colorVarVal').textContent = p.colorVar; }
+    if (p.fontSize !== undefined) { els.fontSize.value = p.fontSize; document.getElementById('fontSizeVal').textContent = p.fontSize; }
+    if (p.bg !== undefined) { els.bgSelect.value = p.bg; loadBackground(p.bg); }
+    scheduleRender();
+  });
+});
+
+// Toolbar buttons
+document.getElementById('refreshSeed').addEventListener('click', () => {
+  renderSeed = Math.floor(Math.random() * 100000);
+  showToast('已生成新版手写字体');
+  scheduleRender();
+});
+document.getElementById('clearText').addEventListener('click', () => {
+  els.textInput.value = ''; updateCharCount(); scheduleRender();
+});
+document.getElementById('loadDemo').addEventListener('click', () => {
+  els.textInput.value = DEMO_TEXT; updateCharCount(); scheduleRender();
+});
+document.getElementById('saveConfig').addEventListener('click', saveConfig);
+document.getElementById('loadConfig').addEventListener('click', loadConfig);
+
+// Config save/load
+function getConfig() {
+  return {
+    font: els.fontSelect.value,
+    bg: els.bgSelect.value,
+    color: els.inkColor.value,
+    colorVar: els.colorVar.value,
+    fontSize: els.fontSize.value,
+    lineSpace: els.lineSpace.value,
+    wordSpace: els.wordSpace.value,
+    offX: els.offX.value,
+    offY: els.offY.value,
+    rot: els.rot.value,
+    scaleVar: els.scaleVar.value,
+    margin: els.margin.value,
+    dpi: els.dpi.value,
+  };
+}
+function saveConfig() {
+  localStorage.setItem('handwriter_config', JSON.stringify(getConfig()));
+  showToast('配置已保存到浏览器');
+}
+function loadConfig() {
+  const cfg = localStorage.getItem('handwriter_config');
+  if (!cfg) { showToast('没有找到保存的配置'); return; }
+  try {
+    const c = JSON.parse(cfg);
+    if (c.font) els.fontSelect.value = c.font;
+    if (c.bg) { els.bgSelect.value = c.bg; loadBackground(parseInt(c.bg)); }
+    if (c.color) els.inkColor.value = c.color;
+    if (c.colorVar) { els.colorVar.value = c.colorVar; document.getElementById('colorVarVal').textContent = c.colorVar; }
+    if (c.fontSize) { els.fontSize.value = c.fontSize; document.getElementById('fontSizeVal').textContent = c.fontSize; }
+    if (c.lineSpace) { els.lineSpace.value = c.lineSpace; document.getElementById('lineSpaceVal').textContent = c.lineSpace; }
+    if (c.wordSpace) { els.wordSpace.value = c.wordSpace; document.getElementById('wordSpaceVal').textContent = c.wordSpace; }
+    if (c.offX) { els.offX.value = c.offX; document.getElementById('offXVal').textContent = c.offX; }
+    if (c.offY) { els.offY.value = c.offY; document.getElementById('offYVal').textContent = c.offY; }
+    if (c.rot) { els.rot.value = c.rot; document.getElementById('rotVal').textContent = c.rot; }
+    if (c.scaleVar) { els.scaleVar.value = c.scaleVar; document.getElementById('scaleVal').textContent = c.scaleVar; }
+    if (c.margin) { els.margin.value = c.margin; document.getElementById('marginVal').textContent = c.margin; }
+    if (c.dpi) { els.dpi.value = c.dpi; document.getElementById('dpiVal').textContent = c.dpi; }
+    showToast('配置已加载'); scheduleRender();
+  } catch(e) { showToast('配置加载失败'); }
+}
+
+// ===================== 渲染引擎 =====================
+let renderTimer = null;
+function scheduleRender() {
+  if (renderTimer) clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => doRender(false), 180);
+}
+function setProgress(v) { els.progressFill.style.width = (v*100)+'%'; }
+
+function getParams() {
+  return {
+    fontSize: parseInt(els.fontSize.value),
+    lineSpacing: parseFloat(els.lineSpace.value),
+    wordSpacing: parseFloat(els.wordSpace.value),
+    color: hexToRgb(els.inkColor.value),
+    colorVar: parseInt(els.colorVar.value),
+    offX: parseFloat(els.offX.value),
+    offY: parseFloat(els.offY.value),
+    rot: parseFloat(els.rot.value),
+    scaleVar: parseFloat(els.scaleVar.value),
+    margin: parseInt(els.margin.value),
+    dpi: parseInt(els.dpi.value),
+  };
+}
+
+function wrapText(ctx, text, maxWidth) {
+  const lines = []; let cur = '';
+  for (const ch of text) {
+    if (ch === '\n') { lines.push(cur); cur = ''; continue; }
+    if (ctx.measureText(cur + ch).width > maxWidth && cur) {
+      lines.push(cur); cur = ch;
+    } else { cur += ch; }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function doRender(isExport = false) {
+  const text = els.textInput.value;
+  if (!text.trim()) { els.statusText.textContent = '请输入文字'; return null; }
+
+  const params = getParams();
+  let targetCanvas = canvas, targetCtx = ctx, W, H, scale;
+
+  if (isExport) {
+    const dpi = params.dpi;
+    W = Math.floor(8.27 * dpi); H = Math.floor(11.69 * dpi);
+    scale = dpi / 200;
+    targetCanvas = document.createElement('canvas');
+    targetCanvas.width = W; targetCanvas.height = H;
+    targetCtx = targetCanvas.getContext('2d');
+  } else {
+    const pw = canvas.parentElement.clientWidth - 40;
+    W = Math.min(900, Math.max(500, pw));
+    H = Math.floor(W * 1.414); scale = W / 1654;
+    canvas.width = W; canvas.height = H;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+  }
+
+  targetCtx.clearRect(0, 0, W, H);
+  if (bgImage) {
+    targetCtx.drawImage(bgImage, 0, 0, W, H);
+  } else {
+    targetCtx.fillStyle = '#fff'; targetCtx.fillRect(0, 0, W, H);
+  }
+
+  const fontSize = Math.floor(params.fontSize * scale);
+  const margin = Math.floor(params.margin * scale);
+  const wordSpacing = params.wordSpacing * scale;
+  const offX = params.offX * scale, offY = params.offY * scale;
+  const fontFamily = els.fontSelect.value.startsWith('__') ? '"KaiTi","楷体",serif' : els.fontSelect.value;
+
+  targetCtx.font = `${fontSize}px ${fontFamily}`;
+  targetCtx.textBaseline = 'alphabetic';
+
+  const contentW = W - margin * 2;
+  const lineHeight = fontSize * params.lineSpacing;
+  const rng = seededRandom(renderSeed);
+  const lines = wrapText(targetCtx, text, contentW);
+
+  els.statusText.textContent = isExport ? '导出中...' : '渲染中...';
+  setProgress(0);
+
+  let y = margin + fontSize;
+  const totalChars = lines.reduce((s,l) => s+l.length, 0);
+  let done = 0, pageCount = 1;
+
+  for (const line of lines) {
+    if (y > H - margin) {
+      // New page indicator for preview
+      if (!isExport) {
+        targetCtx.fillStyle = '#ccc';
+        targetCtx.font = `${Math.floor(12*scale)}px sans-serif`;
+        targetCtx.fillText('— 第 ' + (pageCount+1) + ' 页 —', W/2 - 40*scale, H - 10*scale);
+      }
+      pageCount++; y = margin + fontSize;
+      if (!isExport) break; // Preview only shows first page
+    }
+    let x = margin;
+    for (const ch of line) {
+      if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
+      const cw = targetCtx.measureText(ch).width;
+      const cv = params.colorVar;
+      const r = Math.max(0, Math.min(255, params.color[0] + Math.floor((rng()-0.5)*2*cv)));
+      const g = Math.max(0, Math.min(255, params.color[1] + Math.floor((rng()-0.5)*2*cv)));
+      const b = Math.max(0, Math.min(255, params.color[2] + Math.floor((rng()-0.5)*2*cv)));
+      targetCtx.fillStyle = `rgb(${r},${g},${b})`;
+
+      const dx = (rng()-0.5)*2*offX, dy = (rng()-0.5)*2*offY;
+      const rot = (rng()-0.5)*2*params.rot * (Math.PI/180);
+      const sc = 1.0 + (rng()-0.5)*2*params.scaleVar;
+
+      targetCtx.save();
+      targetCtx.translate(x + dx + cw/2, y + dy);
+      targetCtx.rotate(rot); targetCtx.scale(sc, sc);
+      targetCtx.fillText(ch, -cw/2, 0);
+      targetCtx.restore();
+
+      x += cw + wordSpacing; done++;
+    }
+    y += lineHeight;
+    if (done % 10 === 0) setProgress(done / totalChars);
+  }
+  setProgress(1);
+  els.statusText.textContent = isExport ? '导出完成' : `就绪 · ${pageCount} 页`;
+  els.previewInfo.textContent = `${W}×${H} · ${lines.length} 行`;
+  return { canvas: targetCanvas, pageCount, lines };
+}
+
+// ===================== 导出 =====================
+document.getElementById('exportPng').addEventListener('click', () => {
+  const result = doRender(true);
+  if (!result) return;
+  const link = document.createElement('a');
+  link.download = '手写稿.png';
+  link.href = result.canvas.toDataURL('image/png');
+  link.click();
+  showToast('PNG 已下载');
+});
+
+document.getElementById('exportPdf').addEventListener('click', async () => {
+  const text = els.textInput.value;
+  if (!text.trim()) { showToast('请先输入文字'); return; }
+
+  els.statusText.textContent = '正在生成 PDF...';
+  showToast('正在生成 PDF，请稍候...');
+
+  const params = getParams();
+  const dpi = params.dpi;
+  const W = Math.floor(8.27 * dpi);
+  const H = Math.floor(11.69 * dpi);
+  const scale = dpi / 200;
+
+  // Generate all pages
+  const fontSize = Math.floor(params.fontSize * scale);
+  const margin = Math.floor(params.margin * scale);
+  const wordSpacing = params.wordSpacing * scale;
+  const offX = params.offX * scale, offY = params.offY * scale;
+  const fontFamily = els.fontSelect.value.startsWith('__') ? '"KaiTi","楷体",serif' : els.fontSelect.value;
+
+  // Off-screen canvas for rendering
+  const osc = document.createElement('canvas');
+  osc.width = W; osc.height = H;
+  const octx = osc.getContext('2d');
+  octx.font = `${fontSize}px ${fontFamily}`;
+  octx.textBaseline = 'alphabetic';
+
+  const contentW = W - margin * 2;
+  const lineHeight = fontSize * params.lineSpacing;
+  const rng = seededRandom(renderSeed);
+
+  // Wrap all text
+  const allLines = [];
+  let cur = '';
+  for (const ch of text) {
+    if (ch === '\n') { allLines.push(cur); cur = ''; continue; }
+    if (octx.measureText(cur + ch).width > contentW && cur) {
+      allLines.push(cur); cur = ch;
+    } else { cur += ch; }
+  }
+  if (cur) allLines.push(cur);
+
+  // Paginate
+  const linesPerPage = Math.floor((H - margin * 2) / lineHeight);
+  const pages = [];
+  for (let i = 0; i < allLines.length; i += linesPerPage) {
+    pages.push(allLines.slice(i, i + linesPerPage));
+  }
+  if (pages.length === 0) pages.push([]);
+
+  // Create PDF
+  const { PDFDocument } = PDFLib;
+  const pdfDoc = await PDFDocument.create();
+
+  for (let pi = 0; pi < pages.length; pi++) {
+    const pageLines = pages[pi];
+    // Render page to canvas
+    octx.clearRect(0, 0, W, H);
+    if (bgImage) {
+      octx.drawImage(bgImage, 0, 0, W, H);
+    } else {
+      octx.fillStyle = '#fff'; octx.fillRect(0, 0, W, H);
+    }
+
+    let y = margin + fontSize;
+    for (const line of pageLines) {
+      let x = margin;
+      for (const ch of line) {
+        if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
+        const cw = octx.measureText(ch).width;
+        const cv = params.colorVar;
+        const r = Math.max(0, Math.min(255, params.color[0] + Math.floor((rng()-0.5)*2*cv)));
+        const g = Math.max(0, Math.min(255, params.color[1] + Math.floor((rng()-0.5)*2*cv)));
+        const b = Math.max(0, Math.min(255, params.color[2] + Math.floor((rng()-0.5)*2*cv)));
+        octx.fillStyle = `rgb(${r},${g},${b})`;
+        const dx = (rng()-0.5)*2*offX, dy = (rng()-0.5)*2*offY;
+        const rot = (rng()-0.5)*2*params.rot * (Math.PI/180);
+        const sc = 1.0 + (rng()-0.5)*2*params.scaleVar;
+        octx.save();
+        octx.translate(x + dx + cw/2, y + dy);
+        octx.rotate(rot); octx.scale(sc, sc);
+        octx.fillText(ch, -cw/2, 0);
+        octx.restore();
+        x += cw + wordSpacing;
+      }
+      y += lineHeight;
+    }
+
+    // Add to PDF
+    const pngData = osc.toDataURL('image/png').split(',')[1];
+    const pngImage = await pdfDoc.embedPng(Uint8Array.from(atob(pngData), c => c.charCodeAt(0)));
+    const page = pdfDoc.addPage([W * 72 / dpi, H * 72 / dpi]);
+    page.drawImage(pngImage, { x: 0, y: 0, width: W * 72 / dpi, height: H * 72 / dpi });
+
+    setProgress((pi + 1) / pages.length);
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  download(pdfBytes, '手写稿.pdf', 'application/pdf');
+  els.statusText.textContent = 'PDF 导出完成';
+  showToast(`PDF 已下载 · ${pages.length} 页`);
+});
+
+window.addEventListener('load', init);
+let resizeTimer;
+window.addEventListener('resize', () => {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => doRender(false), 300);
+});
+</script>
+</body>
+</html>
