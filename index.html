@@ -380,7 +380,7 @@ const BUILT_IN_FONTS = [
 ];
 const BUILT_IN_BACKGROUNDS = [
   { name: '纯白', path: null },
-  { name: 'A4本子', path: '背景/A4本子.jpg' },
+  { name: 'A4本子', path: '背景/A4本子.jpg', lines: { firstY: 336, gap: 150, imgH: 5507 } },
   { name: 'A4白纸', path: '背景/A4纯白.jpg' },
   { name: '发黄条纸', path: '背景/发黄 条纸.jpg' },
   { name: '发黄格子纸', path: '背景/发黄 格子纸.jpg' },
@@ -703,6 +703,16 @@ function wrapText(ctx, text, maxWidth) {
 let renderReqId = null;
 let renderGeneration = 0;  // increment on each new render; stale frames abort themselves
 
+/** Compute Y position for a line, aligning to background ruled lines if available.
+ *  pageLineIdx: line index within current page (0 = first line on the page)
+ *  Returns null if no line alignment should be applied.
+ */
+function getLineY(pageLineIdx, H, bgInfo) {
+  if (!bgInfo || !bgInfo.lines || !bgImage) return null;
+  const scale = H / bgInfo.lines.imgH;
+  return bgInfo.lines.firstY * scale + pageLineIdx * bgInfo.lines.gap * scale;
+}
+
 async function doRender(isExport = false) {
   const text = els.textInput.value;
   if (!text.trim()) { els.statusText.textContent = '请输入文字'; return null; }
@@ -753,10 +763,12 @@ async function doRender(isExport = false) {
 
   // Export: synchronous render
   if (isExport) {
-    let y = margin + fontSize;
+    const bgInfo = BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)];
+    let pageLineIdx = 0;
+    let y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize);
     let done = 0, pageCount = 1;
     for (const line of lines) {
-      if (y > H - margin) { pageCount++; y = margin + fontSize; }
+      if (y > H - margin) { pageCount++; pageLineIdx = 0; y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize); }
       let x = margin;
       for (const ch of line) {
         if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
@@ -776,7 +788,8 @@ async function doRender(isExport = false) {
         targetCtx.restore();
         x += cw + wordSpacing; done++;
       }
-      y += lineHeight;
+      pageLineIdx++;
+      y = getLineY(pageLineIdx, H, bgInfo) || (y + lineHeight);
     }
     setProgress(1);
     els.statusText.textContent = '导出完成';
@@ -786,9 +799,11 @@ async function doRender(isExport = false) {
   // Preview: frame-by-frame render for smooth UI
   if (renderReqId) cancelAnimationFrame(renderReqId);
   const myGen = ++renderGeneration;
+  const bgInfo = BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)];
 
   let lineIdx = 0;
-  let y = margin + fontSize;
+  let pageLineIdx = 0;
+  let y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize);
   let pageCount = 1;
   const totalChars = lines.reduce((s,l) => s+l.length, 0);
   let done = 0;
@@ -802,7 +817,8 @@ async function doRender(isExport = false) {
         targetCtx.fillStyle = '#ccc';
         targetCtx.font = `${Math.floor(12*scale)}px sans-serif`;
         targetCtx.fillText('— 第 ' + (pageCount+1) + ' 页 —', W/2 - 40*scale, H - 10*scale);
-        pageCount++; y = margin + fontSize;
+        pageCount++; pageLineIdx = 0;
+        y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize);
         break; // stop at page boundary for preview
       }
       const line = lines[lineIdx];
@@ -826,7 +842,8 @@ async function doRender(isExport = false) {
         targetCtx.restore();
         x += cw + wordSpacing; done++;
       }
-      y += lineHeight; lineIdx++;
+      lineIdx++; pageLineIdx++;
+      y = getLineY(pageLineIdx, H, bgInfo) || (y + lineHeight);
     }
     setProgress(done / totalChars);
 
@@ -913,6 +930,7 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
   const { PDFDocument } = PDFLib;
   const pdfDoc = await PDFDocument.create();
 
+  const bgInfoPdf = BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)];
   for (let pi = 0; pi < pages.length; pi++) {
     const pageLines = pages[pi];
     // Render page to canvas
@@ -923,7 +941,8 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
       octx.fillStyle = '#fff'; octx.fillRect(0, 0, W, H);
     }
 
-    let y = margin + fontSize;
+    let pageLineIdx = 0;
+    let y = getLineY(pageLineIdx, H, bgInfoPdf) || (margin + fontSize);
     for (const line of pageLines) {
       let x = margin;
       for (const ch of line) {
@@ -944,7 +963,8 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
         octx.restore();
         x += cw + wordSpacing;
       }
-      y += lineHeight;
+      pageLineIdx++;
+      y = getLineY(pageLineIdx, H, bgInfoPdf) || (y + lineHeight);
     }
 
     // Add to PDF
