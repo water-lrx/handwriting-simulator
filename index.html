@@ -270,8 +270,8 @@ input[type="color"] {
         <input type="range" id="fontSize" min="16" max="100" value="48">
       </div>
       <div class="field">
-        <label><strong>文字粗细</strong> <span id="fontWeightVal">0</span>px</label>
-        <input type="range" id="fontWeight" min="0" max="3" step="0.1" value="0">
+        <label><strong>文字粗细</strong> <span id="fontWeightVal">2</span>px</label>
+        <input type="range" id="fontWeight" min="0" max="3" step="0.1" value="2">
       </div>
       <div class="field">
         <label><strong>行间距</strong> <span id="lineSpaceVal">1.8</span></label>
@@ -494,8 +494,9 @@ async function init() {
   cbo.value = '__custom__'; cbo.textContent = '━ 上传自定义 ━';
   els.bgSelect.appendChild(cbo);
 
-  els.bgSelect.value = 1;
-  await loadBackground(1);
+  els.fontSelect.value = 'F3';
+  els.bgSelect.value = 2;
+  await loadBackground(2);
   els.textInput.value = DEMO_TEXT;
   updateCharCount();
   els.statusText.textContent = '就绪';
