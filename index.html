@@ -270,6 +270,10 @@ input[type="color"] {
         <input type="range" id="fontSize" min="16" max="100" value="48">
       </div>
       <div class="field">
+        <label><strong>文字粗细</strong> <span id="fontWeightVal">0</span>px</label>
+        <input type="range" id="fontWeight" min="0" max="3" step="0.1" value="0">
+      </div>
+      <div class="field">
         <label><strong>行间距</strong> <span id="lineSpaceVal">1.8</span></label>
         <input type="range" id="lineSpace" min="1.0" max="3.0" step="0.1" value="1.8">
       </div>
@@ -436,6 +440,7 @@ const els = {
   inkColor: document.getElementById('inkColor'),
   colorVar: document.getElementById('colorVar'),
   fontSize: document.getElementById('fontSize'),
+  fontWeight: document.getElementById('fontWeight'),
   lineSpace: document.getElementById('lineSpace'),
   wordSpace: document.getElementById('wordSpace'),
   offX: document.getElementById('offX'),
@@ -558,7 +563,7 @@ els.bgSelect.addEventListener('change', async () => {
 
 // Range inputs
 const rangeMap = [
-  ['colorVar','colorVarVal'], ['fontSize','fontSizeVal'],
+  ['colorVar','colorVarVal'], ['fontSize','fontSizeVal'], ['fontWeight','fontWeightVal'],
   ['lineSpace','lineSpaceVal'], ['wordSpace','wordSpaceVal'],
   ['offX','offXVal'], ['offY','offYVal'], ['rot','rotVal'],
   ['scaleVar','scaleVal'], ['margin','marginVal'], ['dpi','dpiVal'],
@@ -619,6 +624,7 @@ function getConfig() {
     color: els.inkColor.value,
     colorVar: els.colorVar.value,
     fontSize: els.fontSize.value,
+    fontWeight: els.fontWeight.value,
     lineSpace: els.lineSpace.value,
     wordSpace: els.wordSpace.value,
     offX: els.offX.value,
@@ -643,6 +649,7 @@ function loadConfig() {
     if (c.color) els.inkColor.value = c.color;
     if (c.colorVar) { els.colorVar.value = c.colorVar; document.getElementById('colorVarVal').textContent = c.colorVar; }
     if (c.fontSize) { els.fontSize.value = c.fontSize; document.getElementById('fontSizeVal').textContent = c.fontSize; }
+    if (c.fontWeight !== undefined) { els.fontWeight.value = c.fontWeight; document.getElementById('fontWeightVal').textContent = c.fontWeight; }
     if (c.lineSpace) { els.lineSpace.value = c.lineSpace; document.getElementById('lineSpaceVal').textContent = c.lineSpace; }
     if (c.wordSpace) { els.wordSpace.value = c.wordSpace; document.getElementById('wordSpaceVal').textContent = c.wordSpace; }
     if (c.offX) { els.offX.value = c.offX; document.getElementById('offXVal').textContent = c.offX; }
@@ -677,6 +684,7 @@ function setProgress(v) { els.progressFill.style.width = (v*100)+'%'; }
 function getParams() {
   return {
     fontSize: parseInt(els.fontSize.value),
+    fontWeight: parseFloat(els.fontWeight.value),
     lineSpacing: parseFloat(els.lineSpace.value),
     wordSpacing: parseFloat(els.wordSpace.value),
     color: hexToRgb(els.inkColor.value),
@@ -802,6 +810,12 @@ async function doRender(isExport = false) {
         targetCtx.translate(x + dx + cw/2, y + dy);
         targetCtx.rotate(rot); targetCtx.scale(sc, sc);
         targetCtx.fillText(ch, -cw/2, 0);
+        const strokeW = params.fontWeight * scale;
+        if (strokeW > 0) {
+          targetCtx.lineWidth = strokeW / sc;
+          targetCtx.strokeStyle = targetCtx.fillStyle;
+          targetCtx.strokeText(ch, -cw/2, 0);
+        }
         targetCtx.restore();
         x += cw + wordSpacing; done++;
       }
@@ -856,6 +870,12 @@ async function doRender(isExport = false) {
         targetCtx.translate(x + dx + cw/2, y + dy);
         targetCtx.rotate(rot); targetCtx.scale(sc, sc);
         targetCtx.fillText(ch, -cw/2, 0);
+        const strokeW = params.fontWeight * scale;
+        if (strokeW > 0) {
+          targetCtx.lineWidth = strokeW / sc;
+          targetCtx.strokeStyle = targetCtx.fillStyle;
+          targetCtx.strokeText(ch, -cw/2, 0);
+        }
         targetCtx.restore();
         x += cw + wordSpacing; done++;
       }
@@ -979,6 +999,12 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
         octx.translate(x + dx + cw/2, y + dy);
         octx.rotate(rot); octx.scale(sc, sc);
         octx.fillText(ch, -cw/2, 0);
+        const strokeW = params.fontWeight * scale;
+        if (strokeW > 0) {
+          octx.lineWidth = strokeW / sc;
+          octx.strokeStyle = octx.fillStyle;
+          octx.strokeText(ch, -cw/2, 0);
+        }
         octx.restore();
         x += cw + wordSpacing;
       }
