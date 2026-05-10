@@ -759,7 +759,7 @@ async function doRender(isExport = false) {
 
   targetCtx.font = `${fontSize}px ${fontFamily}`;
   targetCtx.textBaseline = 'alphabetic';
-  await document.fonts.ready;
+  try { await document.fonts.load(`${fontSize}px ${fontFamily}`); } catch(e) {}
 
   const leftMargin = getLineX(W, BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)], margin);
   const contentW = W - leftMargin - margin;
@@ -910,7 +910,7 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
   const octx = osc.getContext('2d');
   octx.font = `${fontSize}px ${fontFamily}`;
   octx.textBaseline = 'alphabetic';
-  await document.fonts.ready;
+  try { await document.fonts.load(`${fontSize}px ${fontFamily}`); } catch(e) {}
 
   const bgInfoPdfForWrap = BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)];
   const leftMarginPdf = getLineX(W, bgInfoPdfForWrap, margin);
