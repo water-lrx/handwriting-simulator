@@ -489,6 +489,7 @@ async function init() {
   cbo.value = '__custom__'; cbo.textContent = '━ 上传自定义 ━';
   els.bgSelect.appendChild(cbo);
 
+  els.bgSelect.value = 1;
   await loadBackground(1);
   els.textInput.value = DEMO_TEXT;
   updateCharCount();
