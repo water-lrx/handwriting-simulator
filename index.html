@@ -380,7 +380,7 @@ const BUILT_IN_FONTS = [
 ];
 const BUILT_IN_BACKGROUNDS = [
   { name: '纯白', path: null },
-  { name: 'A4本子', path: '背景/A4本子.jpg', lines: { firstY: 336, gap: 150, imgH: 5507 } },
+  { name: 'A4本子', path: '背景/A4本子.jpg', lines: { firstY: 336, gap: 150, imgH: 5507, marginLeft: 286, imgW: 4000 } },
   { name: 'A4白纸', path: '背景/A4纯白.jpg' },
   { name: '发黄条纸', path: '背景/发黄 条纸.jpg' },
   { name: '发黄格子纸', path: '背景/发黄 格子纸.jpg' },
@@ -713,6 +713,13 @@ function getLineY(pageLineIdx, H, bgInfo) {
   return bgInfo.lines.firstY * scale + pageLineIdx * bgInfo.lines.gap * scale;
 }
 
+/** Compute X start position, respecting background left margin if available. */
+function getLineX(W, bgInfo, fallbackMargin) {
+  if (!bgInfo || !bgInfo.lines || !bgInfo.lines.marginLeft || !bgImage) return fallbackMargin;
+  const scale = W / bgInfo.lines.imgW;
+  return Math.max(fallbackMargin, bgInfo.lines.marginLeft * scale);
+}
+
 async function doRender(isExport = false) {
   const text = els.textInput.value;
   if (!text.trim()) { els.statusText.textContent = '请输入文字'; return null; }
@@ -753,7 +760,8 @@ async function doRender(isExport = false) {
   targetCtx.textBaseline = 'alphabetic';
   await document.fonts.ready;
 
-  const contentW = W - margin * 2;
+  const leftMargin = getLineX(W, BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)], margin);
+  const contentW = W - leftMargin - margin;
   const lineHeight = fontSize * params.lineSpacing;
   const rng = seededRandom(renderSeed);
   const lines = wrapText(targetCtx, text, contentW);
@@ -769,7 +777,7 @@ async function doRender(isExport = false) {
     let done = 0, pageCount = 1;
     for (const line of lines) {
       if (y > H - margin) { pageCount++; pageLineIdx = 0; y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize); }
-      let x = margin;
+      let x = getLineX(W, bgInfo, margin);
       for (const ch of line) {
         if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
         const cw = targetCtx.measureText(ch).width;
@@ -822,7 +830,7 @@ async function doRender(isExport = false) {
         break; // stop at page boundary for preview
       }
       const line = lines[lineIdx];
-      let x = margin;
+      let x = getLineX(W, bgInfo, margin);
       for (const ch of line) {
         if (myGen !== renderGeneration) return;
         if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
@@ -903,7 +911,9 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
   octx.textBaseline = 'alphabetic';
   await document.fonts.ready;
 
-  const contentW = W - margin * 2;
+  const bgInfoPdfForWrap = BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)];
+  const leftMarginPdf = getLineX(W, bgInfoPdfForWrap, margin);
+  const contentW = W - leftMarginPdf - margin;
   const lineHeight = fontSize * params.lineSpacing;
   const rng = seededRandom(renderSeed);
 
@@ -944,7 +954,7 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
     let pageLineIdx = 0;
     let y = getLineY(pageLineIdx, H, bgInfoPdf) || (margin + fontSize);
     for (const line of pageLines) {
-      let x = margin;
+      let x = getLineX(W, bgInfoPdf, margin);
       for (const ch of line) {
         if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
         const cw = octx.measureText(ch).width;
