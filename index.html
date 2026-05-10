@@ -708,17 +708,17 @@ let renderGeneration = 0;  // increment on each new render; stale frames abort t
 /** Compute Y position for a line, aligning to background ruled lines if available.
  *  pageLineIdx: line index within current page (0 = first line on the page)
  *  fontSize: actual rendered font size in pixels
- *  lineHeight: normal line height for this render
- *  Returns null if no line alignment should be applied (e.g. font too large or line spacing too tight).
+ *  scaleVar: random scale variation parameter
+ *  offY: random Y offset (already scaled to canvas pixels)
+ *  Returns null if no line alignment should be applied (e.g. font too large for the gap).
  */
-function getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfo) {
+function getLineY(pageLineIdx, H, fontSize, scaleVar, offY, bgInfo) {
   if (!bgInfo || !bgInfo.lines || !bgImage) return null;
   const scale = H / bgInfo.lines.imgH;
   const gapPx = bgInfo.lines.gap * scale;
-  // Disable line alignment when the ruled gap is too tight:
-  // 1) normal line height already exceeds the gap (alignment would be more crowded)
-  // 2) font size is close to the gap, leaving no room for random offsets/scaling
-  if (lineHeight > gapPx || fontSize > gapPx * 0.6) return null;
+  // Minimum safe vertical space = max possible char height + max up/down offset
+  const minSafeGap = fontSize * (1 + scaleVar) + offY * 2;
+  if (minSafeGap > gapPx) return null;
   return bgInfo.lines.firstY * scale + pageLineIdx * bgInfo.lines.gap * scale;
 }
 
@@ -782,10 +782,10 @@ async function doRender(isExport = false) {
   if (isExport) {
     const bgInfo = BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)];
     let pageLineIdx = 0;
-    let y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfo) || (margin + fontSize);
+    let y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfo) || (margin + fontSize);
     let done = 0, pageCount = 1;
     for (const line of lines) {
-      if (y > H - margin) { pageCount++; pageLineIdx = 0; y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfo) || (margin + fontSize); }
+      if (y > H - margin) { pageCount++; pageLineIdx = 0; y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfo) || (margin + fontSize); }
       let x = getLineX(W, bgInfo, margin);
       for (const ch of line) {
         if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
@@ -806,7 +806,7 @@ async function doRender(isExport = false) {
         x += cw + wordSpacing; done++;
       }
       pageLineIdx++;
-      y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfo) || (y + lineHeight);
+      y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfo) || (y + lineHeight);
     }
     setProgress(1);
     els.statusText.textContent = '导出完成';
@@ -820,7 +820,7 @@ async function doRender(isExport = false) {
 
   let lineIdx = 0;
   let pageLineIdx = 0;
-  let y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfo) || (margin + fontSize);
+  let y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfo) || (margin + fontSize);
   let pageCount = 1;
   const totalChars = lines.reduce((s,l) => s+l.length, 0);
   let done = 0;
@@ -835,7 +835,7 @@ async function doRender(isExport = false) {
         targetCtx.font = `${Math.floor(12*scale)}px sans-serif`;
         targetCtx.fillText('— 第 ' + (pageCount+1) + ' 页 —', W/2 - 40*scale, H - 10*scale);
         pageCount++; pageLineIdx = 0;
-        y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfo) || (margin + fontSize);
+        y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfo) || (margin + fontSize);
         break; // stop at page boundary for preview
       }
       const line = lines[lineIdx];
@@ -860,7 +860,7 @@ async function doRender(isExport = false) {
         x += cw + wordSpacing; done++;
       }
       lineIdx++; pageLineIdx++;
-      y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfo) || (y + lineHeight);
+      y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfo) || (y + lineHeight);
     }
     setProgress(done / totalChars);
 
@@ -961,7 +961,7 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
     }
 
     let pageLineIdx = 0;
-    let y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfoPdf) || (margin + fontSize);
+    let y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfoPdf) || (margin + fontSize);
     for (const line of pageLines) {
       let x = getLineX(W, bgInfoPdf, margin);
       for (const ch of line) {
@@ -983,7 +983,7 @@ document.getElementById('exportPdf').addEventListener('click', async () => {
         x += cw + wordSpacing;
       }
       pageLineIdx++;
-      y = getLineY(pageLineIdx, H, fontSize, lineHeight, bgInfoPdf) || (y + lineHeight);
+      y = getLineY(pageLineIdx, H, fontSize, params.scaleVar, offY, bgInfoPdf) || (y + lineHeight);
     }
 
     // Add to PDF
