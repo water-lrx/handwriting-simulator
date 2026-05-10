@@ -707,11 +707,15 @@ let renderGeneration = 0;  // increment on each new render; stale frames abort t
 
 /** Compute Y position for a line, aligning to background ruled lines if available.
  *  pageLineIdx: line index within current page (0 = first line on the page)
- *  Returns null if no line alignment should be applied.
+ *  fontSize: actual rendered font size in pixels
+ *  Returns null if no line alignment should be applied (e.g. font too large).
  */
-function getLineY(pageLineIdx, H, bgInfo) {
+function getLineY(pageLineIdx, H, fontSize, bgInfo) {
   if (!bgInfo || !bgInfo.lines || !bgImage) return null;
   const scale = H / bgInfo.lines.imgH;
+  const gapPx = bgInfo.lines.gap * scale;
+  // If font is too large for the line spacing, fall back to normal rendering to avoid overlap
+  if (fontSize > gapPx * 0.75) return null;
   return bgInfo.lines.firstY * scale + pageLineIdx * bgInfo.lines.gap * scale;
 }
 
@@ -775,10 +779,10 @@ async function doRender(isExport = false) {
   if (isExport) {
     const bgInfo = BUILT_IN_BACKGROUNDS[parseInt(els.bgSelect.value)];
     let pageLineIdx = 0;
-    let y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize);
+    let y = getLineY(pageLineIdx, H, fontSize, bgInfo) || (margin + fontSize);
     let done = 0, pageCount = 1;
     for (const line of lines) {
-      if (y > H - margin) { pageCount++; pageLineIdx = 0; y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize); }
+      if (y > H - margin) { pageCount++; pageLineIdx = 0; y = getLineY(pageLineIdx, H, fontSize, bgInfo) || (margin + fontSize); }
       let x = getLineX(W, bgInfo, margin);
       for (const ch of line) {
         if (ch === ' ') { x += fontSize * 0.4 + wordSpacing; continue; }
@@ -799,7 +803,7 @@ async function doRender(isExport = false) {
         x += cw + wordSpacing; done++;
       }
       pageLineIdx++;
-      y = getLineY(pageLineIdx, H, bgInfo) || (y + lineHeight);
+      y = getLineY(pageLineIdx, H, fontSize, bgInfo) || (y + lineHeight);
     }
     setProgress(1);
     els.statusText.textContent = '导出完成';
@@ -813,7 +817,7 @@ async function doRender(isExport = false) {
 
   let lineIdx = 0;
   let pageLineIdx = 0;
-  let y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize);
+  let y = getLineY(pageLineIdx, H, fontSize, bgInfo) || (margin + fontSize);
   let pageCount = 1;
   const totalChars = lines.reduce((s,l) => s+l.length, 0);
   let done = 0;
@@ -828,7 +832,7 @@ async function doRender(isExport = false) {
         targetCtx.font = `${Math.floor(12*scale)}px sans-serif`;
         targetCtx.fillText('— 第 ' + (pageCount+1) + ' 页 —', W/2 - 40*scale, H - 10*scale);
         pageCount++; pageLineIdx = 0;
-        y = getLineY(pageLineIdx, H, bgInfo) || (margin + fontSize);
+        y = getLineY(pageLineIdx, H, fontSize, bgInfo) || (margin + fontSize);
         break; // stop at page boundary for preview
       }
       const line = lines[lineIdx];
@@ -853,7 +857,7 @@ async function doRender(isExport = false) {
         x += cw + wordSpacing; done++;
       }
       lineIdx++; pageLineIdx++;
-      y = getLineY(pageLineIdx, H, bgInfo) || (y + lineHeight);
+      y = getLineY(pageLineIdx, H, fontSize, bgInfo) || (y + lineHeight);
     }
     setProgress(done / totalChars);
 
